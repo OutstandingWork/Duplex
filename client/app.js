@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   const startButton = document.getElementById('startButton');
   const stopButton = document.getElementById('stopButton');
+  const sendButton = document.getElementById('sendButton');
+  const textInput = document.getElementById('textInput');
   const transcriptDiv = document.getElementById('transcript');
   let peerConn;
   let mediaStream;
+  let clientSecret;
 
   startButton.addEventListener('click', async () => {
     try {
@@ -15,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(`HTTP error! Status: ${tokenResponse.status}`);
       }
       const { client_secret } = await tokenResponse.json();
+      clientSecret = client_secret;
       console.log('Client secret received:', client_secret);
 
       peerConn = new RTCPeerConnection();
@@ -65,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await peerConn.setRemoteDescription(answer);
 
       stopButton.disabled = false;
+      sendButton.disabled = false;
     } catch (error) {
       console.error('Error during initialization:', error);
       alert('An error occurred during initialization. Please check the console for details.');
@@ -84,6 +89,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     startButton.disabled = false;
     stopButton.disabled = true;
+    sendButton.disabled = true;
+  });
+
+  sendButton.addEventListener('click', async () => {
+    const text = textInput.value;
+    if (text.trim() === '') return;
+
+    displayTranscript(`You: ${text}`);
+    textInput.value = '';
+
+    try {
+      const response = await fetch('/messages', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clientSecret}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      displayTranscript(`Bot: ${data.response}`);
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   });
 
   function displayTranscript(text) {
